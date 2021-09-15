@@ -3,8 +3,8 @@ plugins {
     id 'com.github.johnrengelman.shadow' version '5.2.0'
 }
 
-group 'template.group'
-version '1.0-SNAPSHOT'
+group 'me.brennan'
+version '1.0'
 
 repositories {
     mavenCentral()
@@ -17,7 +17,8 @@ configurations {
 }
 
 dependencies {
-
+    shaded 'com.google.code.gson:gson:+'
+    shaded 'com.squareup.okhttp3:okhttp:+'
 }
 
 shadowJar {
@@ -27,4 +28,3 @@ shadowJar {
 build {
     dependsOn shadowJar
 }
-
