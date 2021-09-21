@@ -279,4 +279,12 @@ public class Electrum {
 
         return sendRequest("payto", params).getAsJsonObject("result").get("hex").getAsString();
     }
+
+    public float getFeeRate(float feeLevel) throws IOException {
+        if(feeLevel < 0.0 || feeLevel > 1.0) throw new IOException("Fee level must be between 0.0 and 1.0");
+
+        float response = sendRequest("getfeerate", new Parameter("fee_level", feeLevel)).get("result").getAsFloat();
+
+        return response / 1000;
+    }
 }

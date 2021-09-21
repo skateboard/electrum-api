@@ -23,14 +23,27 @@ public class ElectrumTest {
         final String tx = electrum.payTo("ADDRESS", 0.1F);
         final String txID = electrum.broadcast(tx);
         System.out.println("https://blockchair.com/bitcoin/transaction/" + txID);
-        
+
         final String maxTX = electrum.payMax("ADDRESS");
         final String maxTXID = electrum.broadcast(maxTX);
         System.out.println("https://blockchair.com/bitcoin/transaction/" + maxTXID);
+
+        sendBTCWithCustomFee(electrum);
 
         final Height height = new Height(0);
         for (Transaction transaction : electrum.getHistory(1, 0, height)) {
             System.out.println(transaction.getAddress() + " - " + transaction.getValue());
         }
+    }
+
+    private static void sendBTCWithCustomFee(Electrum electrum) throws IOException {
+        final float feeRate = electrum.getFeeRate(0.3F);
+        final String txTmp = electrum.payTo("ADDRESS", 0.1F);
+        final float fee = electrum.sat2btc(feeRate * txTmp.length() / 2);
+
+        final String tx = electrum.payTo("ADDRESS", 0.1F, fee);
+        final String txID = electrum.broadcast(tx);
+
+        System.out.println("https://blockchair.com/bitcoin/transaction/" + txID);
     }
 }
