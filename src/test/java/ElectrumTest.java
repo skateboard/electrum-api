@@ -1,5 +1,7 @@
 import me.brennan.electrum.Electrum;
+import me.brennan.electrum.model.Height;
 import me.brennan.electrum.model.Parameter;
+import me.brennan.electrum.model.Transaction;
 
 import java.io.IOException;
 
@@ -16,6 +18,12 @@ public class ElectrumTest {
 
         System.out.println(electrum.isValid(address));
         System.out.println(electrum.isMine(address));
-        System.out.println(electrum.getAddressBalance(address));
+        System.out.println(electrum.getBalance(true));
+        System.out.println(electrum.getBalance(false));
+
+        final Height height = new Height(0);
+        for (Transaction transaction : electrum.getHistory(1, 0, height)) {
+            System.out.println(transaction.getAddress() + " - " + transaction.getValue());
+        }
     }
 }
