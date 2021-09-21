@@ -35,7 +35,7 @@ public class Electrum {
         this.rpcPassword = rpcPassword;
         this.rpcHost = rpcHost;
 
-        this.RPC_URL = String.format("http://%s:%s@%s", rpcUser, rpcPassword, rpcHost);
+        this.RPC_URL = String.format("http://%s:%s@%s:%s", rpcUser, rpcPassword, rpcHost, rpcPort);
     }
 
     public Electrum(String rpcUser, String rpcPassword, String rpcHost, int rpcPort) {
@@ -200,4 +200,83 @@ public class Electrum {
         return transactions;
     }
 
+    /**
+     * Broadcast the HEX encoded transaction ID to the network.
+     *
+     * @param tx - the hex encoded transaction ID
+     * @return - the transaction hash
+     * @throws IOException - failed to send request
+     */
+    public String broadcast(String tx) throws IOException {
+        return sendRequest("broadcast", new Parameter("tx", tx)).getAsJsonObject("result").getAsString();
+    }
+
+    /**
+     * Same as #payTo but no custom fee
+     *
+     * @param address - the destination address
+     * @param amount - the amount you want to send
+     * @return - the hex encoded transaction ID
+     * @throws IOException - failed to send request
+     */
+    public String payTo(String address, float amount) throws IOException {
+        return payTo(address, amount, 0.0F);
+    }
+
+    /**
+     * Generates and signs a new transaction.
+     *
+     * @param address - the destination address
+     * @param amount - the amount you want to send
+     * @param amountFee (optional) - the fee amount
+     * @return - the hex encoded transaction ID
+     * @throws IOException - failed to send request
+     */
+    public String payTo(String address, float amount, float amountFee) throws IOException {
+        if (amount <= 0) return null;
+        if (amountFee >= 0.01) return null;
+
+        Parameter[] params = new Parameter[3];
+        params[0] = new Parameter("destination", address);
+        params[1] = new Parameter("amount", amount);
+
+        if (amountFee > 0.0) {
+            params[3] = new Parameter("fee", amountFee);
+        }
+
+        return sendRequest("payto", params).getAsJsonObject("result").get("hex").getAsString();
+    }
+
+    /**
+     * the same as #payMax but no custom fee
+     *
+     * @param address - destination address
+     * @return - the hex encoded transaction ID
+     * @throws IOException - failed to send request
+     */
+    public String payMax(String address) throws IOException {
+        return payMax(address, 0.0F);
+    }
+
+    /**
+     * The same as #payTo but no amount needed as it sends all the BTC in the wallet.
+     *
+     * @param address - destination address
+     * @param amountFee - the fee amount
+     * @return - the hex encoded transaction ID
+     * @throws IOException - failed to send request
+     */
+    public String payMax(String address, float amountFee) throws IOException {
+        if (amountFee >= 0.01) return null;
+
+        Parameter[] params = new Parameter[3];
+        params[0] = new Parameter("destination", address);
+        params[1] = new Parameter("amount", "!");
+
+        if (amountFee > 0.0) {
+            params[3] = new Parameter("fee", amountFee);
+        }
+
+        return sendRequest("payto", params).getAsJsonObject("result").get("hex").getAsString();
+    }
 }
