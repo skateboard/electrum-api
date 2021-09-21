@@ -1,5 +1,7 @@
 # Electrum api
 a electrum cli wrapper used to accept Bitcoin payments with no third-party applications
+
+Original REPO:
 [Zaczero Electrum PHP](https://github.com/Zaczero/php-electrum-class)
 
 # Getting started
