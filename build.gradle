@@ -17,8 +17,8 @@ configurations {
 }
 
 dependencies {
-    shaded 'com.google.code.gson:gson:+'
-    shaded 'com.squareup.okhttp3:okhttp:+'
+    implementation 'com.google.code.gson:gson:+'
+    implementation 'com.squareup.okhttp3:okhttp:+'
 }
 
 shadowJar {

@@ -1,12 +1,7 @@
 package me.brennan.electrum;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-import me.brennan.electrum.model.Height;
-import me.brennan.electrum.model.Parameter;
-import me.brennan.electrum.model.Transaction;
+import com.google.gson.*;
+import me.brennan.electrum.model.*;
 import me.brennan.electrum.request.JsonBody;
 import okhttp3.Credentials;
 import okhttp3.OkHttpClient;
@@ -22,27 +17,25 @@ import java.util.List;
  * @since 9/15/21
  **/
 public class Electrum {
-    private final String rpcUser, rpcPassword, rpcHost;
-    private int rpcPort = 7777;
+    private final String rpcUser, rpcPassword;
 
     private final String RPC_URL;
 
     private final OkHttpClient httpClient = new OkHttpClient.Builder()
             .build();
 
+    private final Gson GSON = new GsonBuilder().create();
+
     public Electrum(String rpcUser, String rpcPassword, String rpcHost) {
         this.rpcUser = rpcUser;
         this.rpcPassword = rpcPassword;
-        this.rpcHost = rpcHost;
 
-        this.RPC_URL = String.format("http://%s:%s@%s:%s", rpcUser, rpcPassword, rpcHost, rpcPort);
+        this.RPC_URL = String.format("http://%s:%s@%s:%s", rpcUser, rpcPassword, rpcHost, 7777);
     }
 
     public Electrum(String rpcUser, String rpcPassword, String rpcHost, int rpcPort) {
         this.rpcUser = rpcUser;
         this.rpcPassword = rpcPassword;
-        this.rpcHost = rpcHost;
-        this.rpcPort = rpcPort;
 
         this.RPC_URL = String.format("http://%s:%s@%s:%s", rpcUser, rpcPassword, rpcHost, rpcPort);
     }
@@ -51,22 +44,32 @@ public class Electrum {
         final JsonArray paramsArray = new JsonArray();
 
         for(Parameter parameter : params) {
-            final JsonObject parameterObject = new JsonObject();
+            if (parameter.getKey() == null) {
+                if (parameter.getValue() instanceof String) {
+                    paramsArray.add((String) parameter.getValue());
+                } else if(parameter.getValue() instanceof Boolean) {
+                    paramsArray.add((Boolean) parameter.getValue());
+                } else if(parameter.getValue() instanceof Number) {
+                    paramsArray.add((Number) parameter.getValue());
+                }
+            } else {
+                final JsonObject parameterObject = new JsonObject();
 
-            if (parameter.getValue() instanceof String) {
-                parameterObject.addProperty(parameter.getKey(), (String) parameter.getValue());
+                if (parameter.getValue() instanceof String) {
+                    parameterObject.addProperty(parameter.getKey(), (String) parameter.getValue());
+                } else if(parameter.getValue() instanceof Boolean) {
+                    parameterObject.addProperty(parameter.getKey(), (Boolean) parameter.getValue());
 
-            } else if(parameter.getValue() instanceof Boolean) {
-                parameterObject.addProperty(parameter.getKey(), (Boolean) parameter.getValue());
+                } else if(parameter.getValue() instanceof Number) {
+                    parameterObject.addProperty(parameter.getKey(), (Number) parameter.getValue());
+                }
 
-            } else if(parameter.getValue() instanceof Number) {
-                parameterObject.addProperty(parameter.getKey(), (Number) parameter.getValue());
+                paramsArray.add(parameterObject);
             }
-            paramsArray.add(parameterObject);
         }
 
         final JsonObject jsonObject = new JsonObject();
-        jsonObject.addProperty("id", "curltext");
+        jsonObject.addProperty("id", "electrum_java");
         jsonObject.addProperty("method", method);
         jsonObject.add("params", paramsArray);
 
@@ -81,10 +84,17 @@ public class Electrum {
 
             switch (responseCode) {
                 case 200 -> {
-                    return JsonParser.parseString(response.body().string()).getAsJsonObject();
+                    final JsonObject responseObject = JsonParser.parseString(response.body().string()).getAsJsonObject();
+
+                    if (responseObject.has("error")) {
+                        if (!responseObject.get("error").isJsonNull())
+                            throw new IOException("Received an error! " + responseObject);
+                    }
+
+                    return responseObject;
                 }
-                case 400 -> System.out.println("Failed to gather");
-                case 401 -> System.out.println("Failed to authenticate");
+                case 400 -> throw new IOException("Encountered an error! Code: 400");
+                case 401 -> throw new IOException("Failed to authenticate! Code: 401");
             }
         }
 
@@ -107,7 +117,7 @@ public class Electrum {
      * @throws IOException - failed to send request
      */
     public boolean isMine(String address) throws IOException {
-        return sendRequest("ismine", new Parameter("address", address)).get("result").getAsBoolean();
+        return sendRequest("ismine", new Parameter(address)).get("result").getAsBoolean();
     }
 
     /**
@@ -118,7 +128,7 @@ public class Electrum {
      * @throws IOException - failed to send request
      */
     public boolean isValid(String address) throws IOException {
-        return sendRequest("validateaddress", new Parameter("address", address)).get("result").getAsBoolean();
+        return sendRequest("validateaddress", new Parameter(address)).get("result").getAsBoolean();
     }
 
     /**
@@ -127,19 +137,17 @@ public class Electrum {
      * @return the total balance of BTC
      * @throws IOException - failed to send request
      */
-    public float getBalance(boolean confirmedOnly) throws IOException {
+    public Balance getBalance(boolean confirmedOnly) throws IOException {
         final JsonObject response = sendRequest("getbalance").getAsJsonObject("result");
-        float total = 0.0F;
 
-        if (!confirmedOnly && response.has("unconfirmed")) {
-            total += response.get("unconfirmed").getAsFloat();
-        }
+        final Balance balance = new Balance();
+        if (!confirmedOnly && response.has("unconfirmed"))
+            balance.setUnconfirmed(response.get("unconfirmed").getAsString());
 
-        if (response.has("confirmed")) {
-            total += response.get("confirmed").getAsFloat();
-        }
+        if (response.has("confirmed"))
+            balance.setConfirmed(response.get("confirmed").getAsString());
 
-        return total;
+        return balance;
     }
 
     /**
@@ -148,8 +156,14 @@ public class Electrum {
      * @return a JSON array of all addresses on the wallet
      * @throws IOException
      */
-    public JsonArray listAddresses() throws IOException {
-        return sendRequest("listaddresses").get("result").getAsJsonArray();
+    public List<String> listAddresses() throws IOException {
+        final List<String> addresses = new LinkedList<>();
+
+        for (JsonElement jsonElement : sendRequest("listaddresses").get("result").getAsJsonArray()) {
+            addresses.add(jsonElement.getAsString());
+        }
+
+        return addresses;
     }
 
     /**
@@ -166,36 +180,20 @@ public class Electrum {
      * Go through all transactions with provided parameters and returns a list of total transactions.
      *
      * @param minConfirms - only include transactions with a certain min confirms
-     * @param fromHeight - only include transactions from a certain height
-     * @param height - the last height
      * @return - the list of transactions
      * @throws IOException - failed to send request
      */
-    public List<Transaction> getHistory(int minConfirms, int fromHeight, Height height) throws IOException {
+    public List<Transaction> getHistory(int minConfirms) throws IOException {
         final List<Transaction> transactions = new LinkedList<>();
-        final JsonObject response = sendRequest("history", new Parameter("show_addresses", true),
-                new Parameter("show_fiat", true), new Parameter("show_fees", true), new Parameter("from_height", fromHeight)).getAsJsonObject("result");
+        final JsonObject response = sendRequest("onchain_history").getAsJsonObject("result");
 
         for (JsonElement jsonElement : response.getAsJsonArray("transactions")) {
-            if (jsonElement instanceof JsonObject) {
-                final JsonObject transaction = (JsonObject) jsonElement;
-
-                if (!transaction.get("incoming").getAsBoolean() || transaction.get("height").getAsInt() == 0) continue;
+            if (jsonElement instanceof final JsonObject transaction) {
                 if (transaction.get("confirmations").getAsInt() < minConfirms) continue;
 
-                for (JsonElement jsonElement1 : transaction.getAsJsonArray("outputs")) {
-                    if (jsonElement1 instanceof JsonObject) {
-                        final JsonObject output = (JsonObject) jsonElement1;
-
-                        if (isMine(output.get("address").getAsString()))
-                            transactions.add(new Transaction(output.get("address").getAsString(), output.get("value").getAsFloat()));
-                    }
-                }
-
-                height.setLastHeight(transaction.get("height").getAsInt());
+                transactions.add(GSON.fromJson(transaction, Transaction.class));
             }
         }
-
 
         return transactions;
     }
@@ -208,7 +206,7 @@ public class Electrum {
      * @throws IOException - failed to send request
      */
     public String broadcast(String tx) throws IOException {
-        return sendRequest("broadcast", new Parameter("tx", tx)).getAsJsonObject("result").getAsString();
+        return sendRequest("broadcast", new Parameter(tx)).getAsJsonObject("result").getAsString();
     }
 
     /**
@@ -241,7 +239,7 @@ public class Electrum {
         params[1] = new Parameter("amount", amount);
 
         if (amountFee > 0.0) {
-            params[3] = new Parameter("fee", amountFee);
+            params[2] = new Parameter("fee", amountFee);
         }
 
         return sendRequest("payto", params).getAsJsonObject("result").get("hex").getAsString();
@@ -274,17 +272,51 @@ public class Electrum {
         params[1] = new Parameter("amount", "!");
 
         if (amountFee > 0.0) {
-            params[3] = new Parameter("fee", amountFee);
+            params[2] = new Parameter("fee", amountFee);
         }
 
         return sendRequest("payto", params).getAsJsonObject("result").get("hex").getAsString();
     }
 
+    /**
+     * Get the fee rate for a certain fee level (normally used in custom fee transactions)
+     *
+     * @param feeLevel - the fee level
+     * @return - the fee rate to use
+     * @throws IOException - failed to send request
+     */
     public float getFeeRate(float feeLevel) throws IOException {
         if(feeLevel < 0.0 || feeLevel > 1.0) throw new IOException("Fee level must be between 0.0 and 1.0");
 
         float response = sendRequest("getfeerate", new Parameter("fee_level", feeLevel)).get("result").getAsFloat();
 
         return response / 1000;
+    }
+
+    /**
+     * Request a payment really cool for
+     *
+     * @param amount
+     * @param memo
+     * @return
+     * @throws IOException
+     */
+    public PaymentRequest createPaymentRequest(float amount, String memo) throws IOException {
+        if (amount <= 0) return null;
+
+        JsonObject resultObject;
+        if (memo.isEmpty())  {
+            resultObject = sendRequest("add_request", new Parameter(amount)).getAsJsonObject("result");
+        } else {
+            resultObject = sendRequest("add_request", new Parameter(amount), new Parameter(memo))
+                    .getAsJsonObject("result");
+        }
+
+        return GSON.fromJson(resultObject, PaymentRequest.class);
+    }
+
+    public PaymentRequest getPaymentRequest(String address) throws IOException {
+        final JsonObject resultObject = sendRequest("getrequest", new Parameter(address)).getAsJsonObject("result");
+        return GSON.fromJson(resultObject, PaymentRequest.class);
     }
 }

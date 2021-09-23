@@ -1,23 +1,33 @@
 package me.brennan.electrum.model;
 
+import com.google.gson.annotations.SerializedName;
+
 /**
  * @author Brennan
  * @since 9/21/21
+ *
+ * Our transaction class used in Electrum#getHistory()
  **/
 public class Transaction {
-    private final String address;
-    private final float value;
 
-    public Transaction(String address, float value) {
-        this.address = address;
-        this.value = value;
+    @SerializedName("balance")
+    private String balance;
+
+    @SerializedName("txid")
+    private String txID;
+
+    @SerializedName("incoming")
+    private boolean incoming;
+
+    public String getBalance() {
+        return balance;
     }
 
-    public String getAddress() {
-        return address;
+    public String getTxID() {
+        return txID;
     }
 
-    public float getValue() {
-        return value;
+    public boolean isIncoming() {
+        return incoming;
     }
 }

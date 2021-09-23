@@ -1,5 +1,5 @@
 import me.brennan.electrum.Electrum;
-import me.brennan.electrum.model.Height;
+import me.brennan.electrum.model.PaymentRequest;
 import me.brennan.electrum.model.Transaction;
 
 import java.io.IOException;
@@ -15,10 +15,23 @@ public class ElectrumTest {
 
         final String address = electrum.createNewAddress();
 
+        System.out.println(address);
         System.out.println(electrum.isValid(address));
         System.out.println(electrum.isMine(address));
+
         System.out.println(electrum.getBalance(true));
         System.out.println(electrum.getBalance(false));
+
+        final PaymentRequest paymentRequest = electrum.createPaymentRequest(0.00011f, "test");
+        System.out.println(paymentRequest.getAddress());
+
+        final PaymentRequest paymentRequest1 = electrum.getPaymentRequest(paymentRequest.getAddress());
+        System.out.println(paymentRequest1.getAddress());
+//
+        for (Transaction transaction : electrum.getHistory(1)) {
+            System.out.println(transaction.getTxID() + " - " + transaction.getBalance() + " - " + transaction.isIncoming());
+        }
+
 
         final String tx = electrum.payTo("ADDRESS", 0.1F);
         final String txID = electrum.broadcast(tx);
@@ -30,10 +43,6 @@ public class ElectrumTest {
 
         sendBTCWithCustomFee(electrum);
 
-        final Height height = new Height(0);
-        for (Transaction transaction : electrum.getHistory(1, 0, height)) {
-            System.out.println(transaction.getAddress() + " - " + transaction.getValue());
-        }
     }
 
     private static void sendBTCWithCustomFee(Electrum electrum) throws IOException {

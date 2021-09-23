@@ -5,8 +5,12 @@ package me.brennan.electrum.model;
  * @since 9/15/21
  **/
 public class Parameter {
-    private final String key;
-    private final Object value;
+    private String key;
+    private Object value;
+
+    public Parameter(Object value) {
+        this.value = value;
+    }
 
     public Parameter(String key, Object value) {
         this.key = key;

@@ -1,31 +1,36 @@
 # Electrum api
 a electrum cli wrapper used to accept Bitcoin payments with no third-party applications
 
-Original REPO:
-[Zaczero Electrum PHP](https://github.com/Zaczero/php-electrum-class)
+Payment Processing Example: [Example](payment.md)
+
+Send Payments Example: [Example](send_payment.md)
+
+Original Repository: [Zaczero Electrum PHP](https://github.com/Zaczero/php-electrum-class)
 
 # Getting started
 ### Installing Electrum CLI
 ```bash
 # Download package
-wget https://download.electrum.org/3.3.8/Electrum-3.3.8.tar.gz
+wget https://download.electrum.org/4.1.5/Electrum-4.1.5.tar.gz
 
 # Extract package
-tar -xvf Electrum-3.3.8.tar.gz
+tar -xvf Electrum-4.1.5.tar.gz
 
 # Install electrum command
-sudo ln -s $(pwd)/Electrum-3.3.8/run_electrum /usr/local/bin/electrum
+sudo ln -s $(pwd)/Electrum-4.1.5/run_electrum /usr/local/bin/electrum
 
 # Check if everything works properly
 electrum help
 ```
 
-### Configuring RPC
-
+### Starting daemon
 ```bash
-electrum setconfig rpcuser "user"
-electrum setconfig rpcpassword "S3CR3T_password"
-electrum setconfig rpcport 7777
+electrum daemon -d
+```
+
+###[Test Net]
+```bash
+electrum daemon -d --testnet
 ```
 
 ### Creating wallet
@@ -41,13 +46,27 @@ electrum create --segwit
 ```bash
 electrum create
 ```
-
-### Starting Electrum in daemon mode
+###[Test Net]
+* SegWit wallet
 
 ```bash
-# Start the daemon
-electrum daemon start
+electrum create --segwit --testnet
+```
 
+* Legacy wallet
+
+```bash
+electrum create --testnet
+```
+
+
+### Loading Wallet
+```bash
 # Load the wallet
-electrum daemon load_wallet
+electrum load_wallet
+```
+###[Test Net]
+```bash
+# Load the wallet
+electrum load_wallet --testnet
 ```
