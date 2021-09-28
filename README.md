@@ -1,5 +1,5 @@
 # Electrum api
-a electrum cli wrapper used to accept Bitcoin payments with no third-party applications
+a electrum jsonrpc wrapper used to accept Bitcoin payments with no third-party applications
 
 Payment Processing Example: [Example](payment.md)
 
