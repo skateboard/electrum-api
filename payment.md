@@ -30,6 +30,7 @@ I would recommend ether calling this using a JS script every so often on the web
 0 - Just created no BTC sent at all
 7 - Unconfirmed transaction
 3 - Paid, 1 confirmation
+1 - Expired, Failed to pay
 ```
 If the status equals the paid status code, you can then give your user the thing purchased and then save it.
 
