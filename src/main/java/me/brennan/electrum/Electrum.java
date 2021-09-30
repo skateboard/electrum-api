@@ -1,16 +1,24 @@
 package me.brennan.electrum;
 
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.google.gson.*;
+import me.brennan.electrum.listener.CacheRemovalListener;
 import me.brennan.electrum.model.*;
 import me.brennan.electrum.request.JsonBody;
 import okhttp3.Credentials;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @author Brennan
@@ -26,11 +34,25 @@ public class Electrum {
 
     private final Gson GSON = new GsonBuilder().create();
 
+    private final LoadingCache<String, PaymentRequest> storedPaymentRequest;
+
     public Electrum(String rpcUser, String rpcPassword, String rpcHost) {
         this.rpcUser = rpcUser;
         this.rpcPassword = rpcPassword;
 
         this.RPC_URL = String.format("http://%s:%s@%s:%s", rpcUser, rpcPassword, rpcHost, 7777);
+
+        this.storedPaymentRequest = CacheBuilder.newBuilder()
+                .maximumSize(1000)
+                .expireAfterWrite(5, TimeUnit.SECONDS)
+                .removalListener(new CacheRemovalListener())
+                .build(new CacheLoader<>() {
+                    @NotNull
+                    @Override
+                    public PaymentRequest load(@NotNull String address) throws IOException {
+                        return getPaymentRequestFromRPC(address);
+                    }
+                });
     }
 
     public Electrum(String rpcUser, String rpcPassword, String rpcHost, int rpcPort) {
@@ -38,33 +60,37 @@ public class Electrum {
         this.rpcPassword = rpcPassword;
 
         this.RPC_URL = String.format("http://%s:%s@%s:%s", rpcUser, rpcPassword, rpcHost, rpcPort);
+
+        this.storedPaymentRequest = CacheBuilder.newBuilder()
+                .maximumSize(1000)
+                .expireAfterWrite(1, TimeUnit.HOURS)
+                .removalListener(new CacheRemovalListener())
+                .build(new CacheLoader<>() {
+                    @NotNull
+                    @Override
+                    public PaymentRequest load(@NotNull String address) throws IOException {
+                        return getPaymentRequestFromRPC(address);
+                    }
+                });
     }
 
+    /**
+     * send our basic request
+     * @param method - our function
+     * @param params - our params
+     * @return - return JSON object response
+     * @throws IOException - failed to send request
+     */
     private JsonObject sendRequest(String method, Parameter... params) throws IOException {
         final JsonArray paramsArray = new JsonArray();
 
         for(Parameter parameter : params) {
-            if (parameter.getKey() == null) {
-                if (parameter.getValue() instanceof String) {
-                    paramsArray.add((String) parameter.getValue());
-                } else if(parameter.getValue() instanceof Boolean) {
-                    paramsArray.add((Boolean) parameter.getValue());
-                } else if(parameter.getValue() instanceof Number) {
-                    paramsArray.add((Number) parameter.getValue());
-                }
-            } else {
-                final JsonObject parameterObject = new JsonObject();
-
-                if (parameter.getValue() instanceof String) {
-                    parameterObject.addProperty(parameter.getKey(), (String) parameter.getValue());
-                } else if(parameter.getValue() instanceof Boolean) {
-                    parameterObject.addProperty(parameter.getKey(), (Boolean) parameter.getValue());
-
-                } else if(parameter.getValue() instanceof Number) {
-                    parameterObject.addProperty(parameter.getKey(), (Number) parameter.getValue());
-                }
-
-                paramsArray.add(parameterObject);
+            if (parameter.getValue() instanceof String) {
+                paramsArray.add((String) parameter.getValue());
+            } else if(parameter.getValue() instanceof Boolean) {
+                paramsArray.add((Boolean) parameter.getValue());
+            } else if(parameter.getValue() instanceof Number) {
+                paramsArray.add((Number) parameter.getValue());
             }
         }
 
@@ -188,7 +214,8 @@ public class Electrum {
         final JsonObject response = sendRequest("onchain_history").getAsJsonObject("result");
 
         for (JsonElement jsonElement : response.getAsJsonArray("transactions")) {
-            if (jsonElement instanceof final JsonObject transaction) {
+            if (jsonElement instanceof JsonObject) {
+                final JsonObject transaction = (JsonObject) jsonElement;
                 if (transaction.get("confirmations").getAsInt() < minConfirms) continue;
 
                 transactions.add(GSON.fromJson(transaction, Transaction.class));
@@ -235,11 +262,11 @@ public class Electrum {
         if (amountFee >= 0.01) return null;
 
         Parameter[] params = new Parameter[3];
-        params[0] = new Parameter("destination", address);
-        params[1] = new Parameter("amount", amount);
+        params[0] = new Parameter(address);
+        params[1] = new Parameter(amount);
 
         if (amountFee > 0.0) {
-            params[2] = new Parameter("fee", amountFee);
+            params[2] = new Parameter(amountFee);
         }
 
         return sendRequest("payto", params).getAsJsonObject("result").get("hex").getAsString();
@@ -268,11 +295,11 @@ public class Electrum {
         if (amountFee >= 0.01) return null;
 
         Parameter[] params = new Parameter[3];
-        params[0] = new Parameter("destination", address);
-        params[1] = new Parameter("amount", "!");
+        params[0] = new Parameter(address);
+        params[1] = new Parameter("!");
 
         if (amountFee > 0.0) {
-            params[2] = new Parameter("fee", amountFee);
+            params[2] = new Parameter(amountFee);
         }
 
         return sendRequest("payto", params).getAsJsonObject("result").get("hex").getAsString();
@@ -288,7 +315,7 @@ public class Electrum {
     public float getFeeRate(float feeLevel) throws IOException {
         if(feeLevel < 0.0 || feeLevel > 1.0) throw new IOException("Fee level must be between 0.0 and 1.0");
 
-        float response = sendRequest("getfeerate", new Parameter("fee_level", feeLevel)).get("result").getAsFloat();
+        float response = sendRequest("getfeerate").get("result").getAsFloat();
 
         return response / 1000;
     }
@@ -296,26 +323,28 @@ public class Electrum {
     /**
      * Request a payment really cool for
      *
-     * @param amount
-     * @param memo
-     * @return
-     * @throws IOException
+     * @param amount - amount requested
+     * @param memo - a memo (like a description)
+     * @return - the payment request object
+     * @throws IOException - the IO exception
      */
     public PaymentRequest createPaymentRequest(float amount, String memo) throws IOException {
         if (amount <= 0) return null;
 
-        JsonObject resultObject;
-        if (memo.isEmpty())  {
-            resultObject = sendRequest("add_request", new Parameter(amount)).getAsJsonObject("result");
-        } else {
-            resultObject = sendRequest("add_request", new Parameter(amount), new Parameter(memo))
-                    .getAsJsonObject("result");
-        }
+        final JsonObject resultObject = memo.isEmpty() ? sendRequest("add_request", new Parameter(amount)).getAsJsonObject("result") :
+                sendRequest("add_request", new Parameter(amount), new Parameter(memo)).getAsJsonObject("result");
 
-        return GSON.fromJson(resultObject, PaymentRequest.class);
+        final PaymentRequest paymentRequest = GSON.fromJson(resultObject, PaymentRequest.class);
+        storedPaymentRequest.put(paymentRequest.getAddress(), paymentRequest);
+
+        return paymentRequest;
     }
 
-    public PaymentRequest getPaymentRequest(String address) throws IOException {
+    public PaymentRequest getPaymentRequest(String address) {
+        return storedPaymentRequest.getIfPresent(address);
+    }
+
+    public PaymentRequest getPaymentRequestFromRPC(String address) throws IOException {
         final JsonObject resultObject = sendRequest("getrequest", new Parameter(address)).getAsJsonObject("result");
         return GSON.fromJson(resultObject, PaymentRequest.class);
     }

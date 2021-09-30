@@ -1,6 +1,11 @@
 package me.brennan.electrum.model;
 
+import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
+
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * @author Brennan
@@ -25,6 +30,17 @@ public class PaymentRequest {
 
     @SerializedName("expiration")
     private long expiration;
+
+    @Expose
+    private final Map<String, String> metaData = new LinkedHashMap<>();
+
+    public void addMetadata(String key, String value) {
+        metaData.put(key, value);
+    }
+
+    public Map<String, String> getMetaData() {
+        return metaData;
+    }
 
     public String getAddress() {
         return address;
