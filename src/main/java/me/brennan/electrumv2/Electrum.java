@@ -5,9 +5,12 @@ import io.vertx.core.Vertx;
 import io.vertx.core.VertxOptions;
 import io.vertx.core.http.*;
 import me.brennan.electrumv2.model.PaymentRequest;
+import me.brennan.electrumv2.records.Balance;
 import me.brennan.electrumv2.records.Parameter;
 
 import java.util.Base64;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -69,6 +72,137 @@ public class Electrum {
         final var promise = getPaymentRequestAsync(address);
 
         return promise.get();
+    }
+
+    /**
+     * Creates a new address on the wallet.
+     * @return - The new address.
+     * @throws Exception - if the request fails.
+     */
+    public String createNewAddress() throws Exception {
+        final var promise = createNewAddressAsync();
+
+        return promise.get();
+    }
+
+    /**
+     * Creates a new address on the wallet.
+     * @return - The new address.
+     * @throws Exception - if the request fails.
+     */
+    public CompletableFuture<String> createNewAddressAsync() throws Exception {
+        final var resultObject = sendRequest("createnewaddress").get().getAsJsonObject("result");
+
+        return CompletableFuture.completedFuture(resultObject.getAsString());
+    }
+
+    /**
+     * Lists all current address on the wallet.
+     * @return - A list of addresses.
+     * @throws Exception - if the request fails.
+     */
+    public List<String> listAddresses() throws Exception {
+        final var promise = listAddressesAsync();
+
+        return promise.get();
+    }
+
+    /**
+     * Lists all current address on the wallet.
+     * @return - A list of addresses.
+     * @throws Exception - if the request fails.
+     */
+    private CompletableFuture<List<String>> listAddressesAsync() throws Exception {
+        final List<String> addresses = new LinkedList<>();
+
+        final var resultObject = sendRequest("listaddresses").get().getAsJsonArray("result");
+
+        for (final var address : resultObject) {
+            addresses.add(address.getAsString());
+        }
+
+        return CompletableFuture.completedFuture(addresses);
+    }
+
+    /**
+     * Gets total wallet balance.
+     *
+     * @return - The total balance.
+     * @throws Exception - if the request fails.
+     */
+    public Balance getBalance(boolean confirmedOnly) throws Exception {
+        final var promise = getBalanceAsync(confirmedOnly);
+
+        return promise.get();
+    }
+
+    /**
+     * Gets total wallet balance.
+     *
+     * @param confirmedOnly - If true, only returns confirmed balance.
+     * @return - A future with the total balance.
+     * @throws Exception - if the request fails.
+     */
+    private CompletableFuture<Balance> getBalanceAsync(boolean confirmedOnly) throws Exception {
+        final var resultObject = sendRequest("getbalance").get().getAsJsonObject("result");
+
+        String unconfirmed = "0";
+        if (!confirmedOnly && resultObject.has("unconfirmed")) {
+            unconfirmed = resultObject.get("unconfirmed").getAsString();
+        }
+
+        String confirmed = "0";
+        if (resultObject.has("confirmed")) {
+            confirmed = resultObject.get("confirmed").getAsString();
+        }
+
+        return CompletableFuture.completedFuture(new Balance(confirmed, unconfirmed));
+    }
+
+    /**
+     * Determines if the address is a valid btc address.
+     * @param address - The address to check.
+     * @return - true if the address is valid, false otherwise.
+     * @throws Exception - if the request fails.
+     */
+    public boolean isValid(String address) throws Exception {
+        return isValidAsync(address).get();
+    }
+
+    /**
+     * Determines if the address is a valid btc address.
+     * @param address - The address to check.
+     * @return - true if the address is valid, false otherwise.
+     * @throws Exception - if the request fails.
+     */
+    private CompletableFuture<Boolean> isValidAsync(String address) throws Exception {
+        final var resultObject = sendRequest("validateaddress", new Parameter(address)).get().get("result");
+
+        return CompletableFuture.completedFuture(resultObject.getAsBoolean());
+    }
+
+    /**
+     * Determines if the address is a valid electrum address.
+     *
+     * @param address - The address to check.
+     * @return - true if the address is valid, false otherwise.
+     * @throws Exception - if the request fails.
+     */
+    public boolean isMine(String address) throws Exception {
+        return isMineAsync(address).get();
+    }
+
+    /**
+     * Determines if the address is a valid electrum address.
+     *
+     * @param address - The address to check.
+     * @return - true if the address is valid, false otherwise.
+     * @throws Exception - if the request fails.
+     */
+    private CompletableFuture<Boolean> isMineAsync(String address) throws Exception {
+        final var resultObject = sendRequest("ismine", new Parameter(address)).get().get("result");
+
+        return CompletableFuture.completedFuture(resultObject.getAsBoolean());
     }
 
     /**
@@ -181,5 +315,24 @@ public class Electrum {
         }
 
         return CompletableFuture.completedFuture(null);
+    }
+
+
+    /**
+     * BTC TO SAT
+     * @param btc - The amount of BTC to convert
+     * @return - The amount of satoshis
+     */
+    public float btc2sat(float btc) {
+        return btc * 100000000;
+    }
+
+    /**
+     * SAT TO BTC
+     * @param sat - The amount of satoshis to convert
+     * @return - The amount of BTC
+     */
+    public float sat2btc(float sat) {
+        return sat / 100000000;
     }
 }
