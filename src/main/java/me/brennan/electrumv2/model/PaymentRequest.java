@@ -1,15 +1,14 @@
-package me.brennan.electrum.model;
+package me.brennan.electrumv2.model;
 
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
 
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * @author Brennan
- * @since 9/22/2021
+ * @author Brennan / skateboard
+ * @since 5/3/2022
  **/
 public class PaymentRequest {
 
@@ -31,15 +30,8 @@ public class PaymentRequest {
     @SerializedName("expiration")
     private long expiration;
 
-    @Expose
-    private final Map<String, String> metaData = new LinkedHashMap<>();
-
-    public void addMetadata(String key, String value) {
-        metaData.put(key, value);
-    }
-
-    public Map<String, String> getMetaData() {
-        return metaData;
+    public PaymentStatus getStatus() {
+        return PaymentStatus.fromInt(status);
     }
 
     public String getAddress() {
@@ -54,15 +46,39 @@ public class PaymentRequest {
         return statusString;
     }
 
-    public int getStatus() {
-        return status;
-    }
-
     public String getAmountBTC() {
         return amountBTC;
     }
 
     public long getExpiration() {
         return expiration;
+    }
+
+    public enum PaymentStatus {
+        UNKNOWN(-1),
+        CREATED(0),
+        UNCONFIRMED(7),
+        PAID(3),
+        EXPIRED(1);
+
+        private final int status;
+
+        PaymentStatus(int status) {
+            this.status = status;
+        }
+
+        public static PaymentStatus fromInt(int status) {
+            for (PaymentStatus paymentStatus : PaymentStatus.values()) {
+                if (paymentStatus.getStatus() == status) {
+                    return paymentStatus;
+                }
+            }
+
+            return UNKNOWN;
+        }
+
+        public int getStatus() {
+            return status;
+        }
     }
 }
