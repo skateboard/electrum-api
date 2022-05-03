@@ -44,18 +44,40 @@ public class Electrum {
                 setTrustAll(true));
     }
 
+    /**
+     * Creates a Payment Request and waits for the future to complete.
+     *
+     * @param amount - The amount of the payment request
+     * @param memo - The memo of the payment request
+     * @return - the payment request
+     * @throws Exception - if the request fails.
+     */
     public PaymentRequest createPaymentRequest(float amount, String memo) throws Exception {
         final var promise = createPaymentRequestAsync(amount, memo);
 
         return promise.get();
     }
 
+    /**
+     * Gets a Payment Request and waits for the future to complete.
+     *
+     * @param address - The address of the payment request.
+     * @return - the payment request.
+     * @throws Exception - if the request fails.
+     */
     public PaymentRequest getPaymentRequest(String address) throws Exception {
         final var promise = getPaymentRequestAsync(address);
 
         return promise.get();
     }
 
+    /**
+     * Gets a Payment Request.
+     *
+     * @param address - The address of the payment request.
+     * @return - a future containing the payment request result.
+     * @throws Exception - if the request fails.
+     */
     private CompletableFuture<PaymentRequest> getPaymentRequestAsync(String address) throws Exception {
         final var resultObject = sendRequest("getrequest", new Parameter(address)).get().getAsJsonObject("result");
         final var paymentRequest = GSON.fromJson(resultObject, PaymentRequest.class);
@@ -63,6 +85,14 @@ public class Electrum {
         return CompletableFuture.completedFuture(paymentRequest);
     }
 
+    /**
+     * Sends a Payment Request.
+     *
+     * @param amount - The amount of the payment request
+     * @param memo - The memo of the payment request
+     * @return - a future containing the payment request result.
+     * @throws Exception - if the request fails.
+     */
     private CompletableFuture<PaymentRequest> createPaymentRequestAsync(float amount, String memo) throws Exception {
         if (amount <= 0) return CompletableFuture.completedFuture(null);
 
@@ -73,6 +103,17 @@ public class Electrum {
         return CompletableFuture.completedFuture(paymentRequest);
     }
 
+    /**
+     * Sends a request to the Electrum server using the specified method and parameters.
+     *
+     * @param method - The method to call on the Electrum server.
+     * @param parameters - The parameters to pass to the Electrum server.
+     * @return - A future containing the JsonObject result of the request.
+     *
+     * @throws ExecutionException - If the request failed to complete.
+     * @throws InterruptedException - If the request was interrupted.
+     * @throws TimeoutException - If the request timed out.
+     */
     private CompletableFuture<JsonObject> sendRequest(String method, Parameter... parameters) throws ExecutionException, InterruptedException, TimeoutException {
         final JsonArray paramsArray = new JsonArray();
 
@@ -113,6 +154,13 @@ public class Electrum {
 
     }
 
+    /**
+     * Sends a post request to the specified url and returns the response.
+     *
+     * @param url - The URL of the post request
+     * @param body - The body of the post request
+     * @return - A future that will contain the response of the post request
+     */
     private CompletableFuture<HttpClientResponse> post(String url, String body) {
         try {
             final var requestPromise = new CompletableFuture<HttpClientResponse>();
